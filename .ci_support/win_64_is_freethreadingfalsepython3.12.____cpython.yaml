@@ -4,6 +4,8 @@ channel_sources:
 - conda-forge
 channel_targets:
 - conda-forge main
+is_freethreading:
+- false
 pin_run_as_build:
   python:
     min_pin: x.x
@@ -14,3 +16,6 @@ rust_compiler:
 - rust
 target_platform:
 - win-64
+zip_keys:
+- - python
+  - is_freethreading

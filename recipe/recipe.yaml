@@ -23,7 +23,7 @@ build:
   python:
     version_independent: true
   skip:
-    - not (match(python, python_min ~ ".*") and is_abi3)
+    - not ((match(python, python_min ~ ".*") and is_abi3) or is_freethreading)
 
 requirements:
   build:
@@ -39,7 +39,9 @@ requirements:
     - maturin >=1.4,<2.0
     - pip
     - python
-    - python-abi3
+    - if: is_abi3
+      then:
+        - python-abi3
   run:
     - numpy >=2.0
     - python

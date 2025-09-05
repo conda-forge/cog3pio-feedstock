@@ -48,6 +48,8 @@ requirements:
     - if: not is_freethreading
       then:
         - xarray >=2023.12.0
+      else:
+        - python-freethreading
 
 tests:
   - python:
@@ -56,21 +58,26 @@ tests:
       # Re-enable pip_check when pandas (dependency of xarray) supports freethreading
       # https://github.com/conda-forge/pandas-feedstock/pull/224
       pip_check: false
-      python_version: ${{ python_min + ".*" if is_abi3 else "" }}
+      python_version: ${{ python_min + ".*" if is_abi3 else null }}
   - script:
       # NOTE: we must manually set SP_DIR since it is not set.
       # Can be removed once https://github.com/prefix-dev/rattler-build/issues/1733 is fixed.
-      - if: unix
+      - if: unix and is_abi3
         then:
           - export SP_DIR=$(python -c "import site; print(site.getsitepackages()[0])")
           - abi3audit $SP_DIR/cog3pio/cog3pio.abi3.so -s -v --assume-minimum-abi3 ${{ python_min }}
-      - if: win
+      - if: win and is_abi3
         then:
           - set "SP_DIR=%PREFIX%\\Lib\\site-packages"
           - abi3audit %SP_DIR%\\cog3pio\\cog3pio.pyd -s -v --assume-minimum-abi3 ${{ python_min }}
+      # Needed to avoid "expected field `script` to be a list of commands" on is_freethreading
+      - if: not is_abi3
+        then: true
     requirements:
       run:
-        - abi3audit
+        - if: is_abi3
+          then:
+            - abi3audit
 
 about:
   homepage: https://cog3pio.readthedocs.io

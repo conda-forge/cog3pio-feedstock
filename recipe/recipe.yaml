@@ -39,6 +39,7 @@ build:
     version_independent: true
   skip:
     - not ((match(python, python_min ~ ".*") and is_abi3) or is_freethreading)
+    - ppc64le and is_freethreading
 
 requirements:
   build:
@@ -61,8 +62,7 @@ requirements:
     - pip
     - python
     - if: is_abi3
-      then:
-        - python-abi3
+      then: python-abi3
   run:
     - numpy >=2.0
     - python

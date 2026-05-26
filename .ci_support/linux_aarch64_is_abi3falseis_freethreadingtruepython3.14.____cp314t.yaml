@@ -9,23 +9,22 @@ channel_targets:
 docker_image:
 - quay.io/condaforge/linux-anvil-x86_64:alma9
 is_abi3:
-- true
-is_freethreading:
 - false
+is_freethreading:
+- true
 pin_run_as_build:
   python:
     min_pin: x.x
     max_pin: x.x
 python:
-- 3.12.* *_cpython
+- 3.14.* *_cp314t
 python_min:
 - '3.10'
 rust_compiler:
 - rust
 target_platform:
-- linux-64
+- linux-aarch64
 zip_keys:
 - - python
-  - channel_sources
   - is_freethreading
   - is_abi3

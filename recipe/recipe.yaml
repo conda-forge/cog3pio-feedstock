@@ -1,7 +1,8 @@
 context:
   name: cog3pio
-  python_min: "3.12"
-  version: 0.0.1
+  python_min: "3.13"
+  version: 0.1.0
+  target_type: ${{ "x86_64-linux" if (linux and x86_64) else "sbsa-linux" }}
 
 package:
   name: ${{ name|lower }}
@@ -9,21 +10,36 @@ package:
 
 source:
   url: https://pypi.org/packages/source/${{ name[0] }}/${{ name }}/cog3pio-${{ version }}.tar.gz
-  sha256: f48e14b75355316a7ee540248229fe846bea353a740afc8a3ebb9a00b4b9eb9a
+  sha256: 7a84fc884d7dacaec2d7cab28f83e700a70d5197b43df002bb2f2a3e34bcf0e3
 
 build:
-  number: 2
+  number: 0
   script:
     env:
       CARGO_PROFILE_RELEASE_STRIP: symbols
       CARGO_PROFILE_RELEASE_LTO: fat
     content:
+      - if: ppc64le
+        then:
+          # Rust 1.90 uses lld by default and has issue linking to conda libraries
+          # compiled with newer gcc
+          - export RUSTFLAGS="$RUSTFLAGS -C link-arg=-fuse-ld=bfd"
+      - if: linux and (x86_64 or aarch64)
+        then:
+          - sed --in-place "s/nvtiffTagDataType type/enum nvtiffTagDataType type/g" $BUILD_PREFIX/include/nvtiff.h
+          - ln -s $BUILD_PREFIX/include/nvtiff.h $BUILD_PREFIX/targets/${{ target_type }}/include/nvtiff.h;
+          - ln -s $BUILD_PREFIX/include/nvtiff_version.h $BUILD_PREFIX/targets/${{ target_type }}/include/nvtiff_version.h;
+          - ln -s $BUILD_PREFIX/lib/libnvtiff.so $BUILD_PREFIX/targets/${{ target_type }}/lib/libnvtiff.so;
+          - export RUSTFLAGS="-L$BUILD_PREFIX/targets/${{ target_type }}/lib"
+          - export BINDGEN_EXTRA_CLANG_ARGS="-I $BUILD_PREFIX/targets/${{ target_type }}/include"
+          - export MATURIN_PEP517_ARGS="--features cuda,pyo3"
       - cargo-bundle-licenses --format yaml --output THIRDPARTY.yml
       - ${{ PYTHON }} -m pip install . -vv --no-deps --no-build-isolation
   python:
     version_independent: true
   skip:
     - not ((match(python, python_min ~ ".*") and is_abi3) or is_freethreading)
+    - ppc64le and is_freethreading
 
 requirements:
   build:
@@ -33,43 +49,45 @@ requirements:
     - if: build_platform != target_platform
       then:
         - cross-python_${{ target_platform }}
-        - maturin >=1.4,<2.0
+        - maturin >=1.12,<2.0
         - python
+    - if: linux and (x86_64 or aarch64)
+      then:
+        - clangdev
+        - cuda-cudart-dev
+        - cuda-crt
+        - libnvtiff-dev 0.7.*
   host:
-    - maturin >=1.4,<2.0
+    - maturin >=1.12,<2.0
     - pip
     - python
     - if: is_abi3
-      then:
-        - python-abi3
+      then: python-abi3
   run:
     - numpy >=2.0
     - python
-    - if: not is_freethreading
-      then:
-        - xarray >=2023.12.0
-      else:
-        - python-freethreading
+    - if: is_freethreading
+      then: python-freethreading
+    - if: linux and (x86_64 or aarch64)
+      then: libnvtiff 0.7.*
 
 tests:
   - python:
       imports:
         - cog3pio
-      # Re-enable pip_check when pandas (dependency of xarray) supports freethreading
-      # https://github.com/conda-forge/pandas-feedstock/pull/224
-      pip_check: false
-      python_version: ${{ python_min + ".*" if is_abi3 else null }}
+      pip_check: true
+      python_version:
+        - if: is_abi3
+          then: ${{ python_min ~ '.*' }}
+        - "*"
   - script:
-      # NOTE: we must manually set SP_DIR since it is not set.
-      # Can be removed once https://github.com/prefix-dev/rattler-build/issues/1733 is fixed.
+      - python -c "import cog3pio; assert cog3pio.__version__ == '${{ version }}', cog3pio.__version__"
+      - if: linux and (x86_64 or aarch64)
+        then: python -c "from cog3pio import CudaCogReader"
       - if: unix and is_abi3
-        then:
-          - export SP_DIR=$(python -c "import site; print(site.getsitepackages()[0])")
-          - abi3audit $SP_DIR/cog3pio/cog3pio.abi3.so -s -v --assume-minimum-abi3 ${{ python_min }}
+        then: abi3audit $SP_DIR/cog3pio/cog3pio.abi3.so -s -v --assume-minimum-abi3 ${{ python_min }}
       - if: win and is_abi3
-        then:
-          - set "SP_DIR=%PREFIX%\\Lib\\site-packages"
-          - abi3audit %SP_DIR%\\cog3pio\\cog3pio.pyd -s -v --assume-minimum-abi3 ${{ python_min }}
+        then: abi3audit %SP_DIR%\\cog3pio\\cog3pio.pyd -s -v --assume-minimum-abi3 ${{ python_min }}
       # Needed to avoid "expected field `script` to be a list of commands" on is_freethreading
       - if: not is_abi3
         then: true

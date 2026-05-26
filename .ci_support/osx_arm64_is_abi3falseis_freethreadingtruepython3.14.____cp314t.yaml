@@ -21,7 +21,7 @@ pin_run_as_build:
     min_pin: x.x
     max_pin: x.x
 python:
-- 3.13.* *_cp313t
+- 3.14.* *_cp314t
 python_min:
 - '3.10'
 rust_compiler:
@@ -30,6 +30,5 @@ target_platform:
 - osx-arm64
 zip_keys:
 - - python
-  - channel_sources
   - is_freethreading
   - is_abi3
